@@ -5,9 +5,15 @@ import (
 )
 
 type File struct {
-	Name string
-	ContentType string
-	Revisions []SHA1Sum
+	Filer Filer `json:"-"`
+
+	Name string `json:"name"`
+	ContentType string `json:"content_type"`
+	Revisions []SHA1Sum `json:"revisions"`
+}
+
+func (f *File) AddRevision(sha SHA1Sum) error {
+	return f.Filer.AddRevision(f, sha)
 }
 
 func (f *File) Latest() (SHA1Sum, error) {

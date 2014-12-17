@@ -2,7 +2,6 @@ package storers
 
 import (
 	"time"
-	"log"
 	"fmt"
 	"strings"
 	"github.com/garyburd/redigo/redis"
@@ -37,8 +36,8 @@ func (r *RedisStorer) Init(host, namespace string, port int64) {
 	r.Namespace = namespace
 }
 
-func (r *RedisStorer) GetFullKey(key string) string {
-	return fmt.Sprintf("%s:%s", r.Namespace, key)
+func (r *RedisStorer) GetFullKey(args ...string) string {
+	return fmt.Sprintf("%s:%s", r.Namespace, strings.Join(args, ":"))
 }
 
 func (r *RedisStorer) GetSubKey(key string) string {

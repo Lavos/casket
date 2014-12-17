@@ -2,19 +2,24 @@ package main
 
 import (
 	"log"
+	// "github.com/Lavos/casket"
 	"github.com/Lavos/casket/contentstorers"
+	"github.com/Lavos/casket/filers"
 )
 
 func main () {
 	r := contentstorers.NewRedis("localhost", "casket", 6379)
+	f := filers.NewRedis("localhost", "casket", 6379)
 
-	log.Printf("r: %#v", r)
+	// file, err := f.NewFile("abc/xyz/index.html", "text/html")
+	file, err := f.Get("abc/xyz/index.html")
 
-	s, err := r.Put([]byte("blah"))
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	log.Printf("%#v %#v", s, err)
+	sha, err := r.Put([]byte("12345"))
 
-	c, err := r.Get(s)
-
-	log.Printf("%s %#v", c, err)
+	file.AddRevision(sha)
+	log.Printf("file: %#v, err: %#v", file, err)
 }
