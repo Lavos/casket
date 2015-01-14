@@ -21,6 +21,12 @@ func NewSHA1SumFromString (s string) SHA1Sum {
 	return n
 }
 
+func NewSHA1SumFromBytes (b []byte) SHA1Sum {
+	var n SHA1Sum
+	copy(n[:], b)
+	return n
+}
+
 func (s SHA1Sum) String() string {
 	return hex.EncodeToString(s[:])
 }
