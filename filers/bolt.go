@@ -3,9 +3,10 @@ package filers
 import (
 	"fmt"
 	"bytes"
+	"log"
 
-	"github.com/lavos/casket"
-	"github.com/lavos/casket/storers"
+	"github.com/Lavos/casket"
+	"github.com/Lavos/casket/storers"
 	"github.com/boltdb/bolt"
 )
 
@@ -24,11 +25,11 @@ func NewBolt(path string) (*Bolt, error) {
 }
 
 func (b *Bolt) CreateKey(filename, property string) []byte {
-	return fmt.Sprintf("%s:%s", filename, property)
+	return []byte(fmt.Sprintf("%s:%s", filename, property))
 }
 
 func (b *Bolt) Get(filename string) (*casket.File, error) {
-	var file Casket.File
+	var file casket.File
 	file.Filer = b
 	file.Name = filename
 
@@ -39,36 +40,38 @@ func (b *Bolt) Get(filename string) (*casket.File, error) {
 			return fmt.Errorf("Could not find bucket %s", BucketFiles)
 		}
 
-		file.ContentType = bucket.Get(b.CreateKey(filename, "content_type"))
+		file.ContentType = string(bucket.Get(b.CreateKey(filename, "content_type")))
 
-		buf := bytes.NewBuffer(bucket.Get(b.CreateKey(filename, "revisions")))
+		rev := bucket.Get(b.CreateKey(filename, "revisions"))
 
-		count := len(buf) / 20
-		file.Revisions = make([]SHA1Sum, count)
+		if len(rev) >= 20 {
+			count := len(rev) / 20
+			file.Revisions = make([]casket.SHA1Sum, count)
 
-		for x := 0; x < count; x++ {
-			file.Revisions[x] = casket.NewSHA1SumFromBytes(buf[(x * 20):((x + 1) * 20)])
+			for x := 0; x < count; x++ {
+				file.Revisions[x] = casket.NewSHA1SumFromBytes(rev[(x * 20):((x + 1) * 20)])
+			}
 		}
 
 		return nil
 	})
 
-	if bolt_err == nil {
+	if bolt_err != nil {
 		return nil, bolt_err
 	}
 
-	return file, nil
+	return &file, nil
 }
 
 func (b *Bolt) Put(file *casket.File) error {
 	return b.DB.Update(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(BucketFiles)
+		bucket, err := tx.CreateBucketIfNotExists(BucketFiles)
 
-		if bucket == nil {
-			return fmt.Errorf("Could not find bucket %s", BucketFiles)
+		if err != nil {
+			return err
 		}
 
-		err := bucket.Put(b.CreateKey(file.Name, "content_type"), []byte(file.ContentType))
+		err = bucket.Put(b.CreateKey(file.Name, "content_type"), []byte(file.ContentType))
 
 		if err != nil {
 			return err
@@ -76,7 +79,7 @@ func (b *Bolt) Put(file *casket.File) error {
 
 		var buf bytes.Buffer
 
-		for i, rev := range file.Revisions {
+		for _, rev := range file.Revisions {
 			buf.Write(rev[:])
 		}
 
@@ -87,14 +90,65 @@ func (b *Bolt) Put(file *casket.File) error {
 }
 
 func (b *Bolt) NewFile(filename string, content_type string) (*casket.File, error) {
+	var file casket.File
+	file.Name = filename
+	file.ContentType = content_type
+	file.Filer = b
+	file.Revisions = make([]casket.SHA1Sum, 0)
 
+	err := b.Put(&file)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &file, nil
 }
 
-func (b *Bolt) AddRevision(file *casket.File, casket.SHA1Sum) error {
+func (b *Bolt) AddRevision(file *casket.File, sha1sum casket.SHA1Sum) error {
+	log.Printf("ADD REVISION %#v %#v", file, sha1sum)
 
+	file.Revisions = append(file.Revisions, sha1sum)
+
+	log.Printf("ADDED %#v", file)
+
+	return b.DB.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(BucketFiles)
+
+		if bucket == nil {
+			return fmt.Errorf("Could not find bucket %s", BucketFiles)
+		}
+
+		buf := bucket.Get(b.CreateKey(file.Name, "revisions"))
+		size := len(buf) + len(sha1sum)
+		newbuf := make([]byte, len(buf), size)
+		copy(newbuf, buf)
+		newbuf = append(newbuf, sha1sum[:]...)
+
+		return bucket.Put(b.CreateKey(file.Name, "revisions"), newbuf)
+	})
 }
 
 func (b *Bolt) Exists(filename string) (bool, error) {
+	var exists bool
 
+	err := b.DB.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(BucketFiles)
 
+		if bucket == nil {
+			return fmt.Errorf("Could not find bucket %s", BucketFiles)
+		}
+
+		p := bucket.Get(b.CreateKey(filename, "content_type"))
+
+		if len(p) > 0 {
+			exists = true
+		} else {
+			exists = false
+		}
+
+		return nil
+	})
+
+	return exists, err
 }

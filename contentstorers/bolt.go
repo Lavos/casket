@@ -1,14 +1,15 @@
 package contentstorers
 
 import (
-	"github.com/lavos/casket"
-	"github.com/lavos/casket/storers"
+	"fmt"
+	"github.com/Lavos/casket"
+	"github.com/Lavos/casket/storers"
 	"github.com/boltdb/bolt"
 )
 
 var (
 	BucketRevisions = []byte("revisions")
-}
+)
 
 type Bolt struct {
 	storers.Bolt
@@ -21,7 +22,7 @@ func NewBolt(path string) (*Bolt, error) {
 }
 
 func (b *Bolt) Put(p []byte) (casket.SHA1Sum, error) {
-	s := casket.NewSHA1Sum(content)
+	s := casket.NewSHA1Sum(p)
 
 	return s, b.DB.Update(func(tx *bolt.Tx) error {
 		bucket, err := tx.CreateBucketIfNotExists(BucketRevisions)

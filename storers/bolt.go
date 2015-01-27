@@ -1,4 +1,4 @@
-package storer
+package storers
 
 import (
 	"github.com/boltdb/bolt"
